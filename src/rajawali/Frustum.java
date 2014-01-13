@@ -134,4 +134,8 @@ public class Frustum {
 		} 
 		return mBoundingBox;
 	}
+	
+	public Matrix4 getModelMatrix() {
+		return mTmpMatrix;
+	}
 }

@@ -18,6 +18,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -51,12 +52,13 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
+import android.os.AsyncTask;
 import android.os.SystemClock;
 import android.service.wallpaper.WallpaperService;
 import android.view.MotionEvent;
 import android.view.WindowManager;
 
-public class RajawaliRenderer implements GLSurfaceView.Renderer, INode {
+public class RajawaliRenderer implements GLSurfaceView.Renderer, INode, IAsyncTaskListener {
 	protected final int GL_COVERAGE_BUFFER_BIT_NV = 0x8000;
 
 	protected Context mContext; //Context the renderer is running in
@@ -114,6 +116,8 @@ public class RajawaliRenderer implements GLSurfaceView.Renderer, INode {
 	
 	private List<RajawaliScene> mScenes; //List of all scenes this renderer is aware of.
 	private List<RenderTarget> mRenderTargets;
+	private List<IAsyncTask> mTasks;
+	private List<IAsyncTask> mStartedTasks;
 	
 	/**
 	 * The scene currently being displayed.
@@ -132,6 +136,8 @@ public class RajawaliRenderer implements GLSurfaceView.Renderer, INode {
 		mContext = context;
 		mFrameRate = getRefreshRate();
 		mScenes = Collections.synchronizedList(new CopyOnWriteArrayList<RajawaliScene>());
+		mTasks = Collections.synchronizedList(new CopyOnWriteArrayList<IAsyncTask>());
+		mStartedTasks = Collections.synchronizedList(new CopyOnWriteArrayList<IAsyncTask>());
 		mSceneQueue = new LinkedList<AFrameTask>();
 		mSceneCachingEnabled = true;
 		mSceneInitialized = false;
@@ -545,9 +551,10 @@ public class RajawaliRenderer implements GLSurfaceView.Renderer, INode {
 			mMaterialManager.setContext(this.getContext());
 			mMaterialManager.registerRenderer(this);
 			
-			getCurrentScene().resetGLState();
-			
+			getCurrentScene().resetGLState();			
 			initScene();
+			//start async tasks
+			executeAsyncTasks();
 		}
 
 		if (!mSceneCachingEnabled) {
@@ -676,6 +683,13 @@ public class RajawaliRenderer implements GLSurfaceView.Renderer, INode {
 			for (int i = 0, j = mScenes.size(); i < j; ++i)
 				mScenes.get(i).destroyScene();
 		}
+		
+		//clear all task
+		for(IAsyncTask task: mTasks ){
+			task.cancel();
+		}		
+		mTasks.clear();
+		
 		stopRendering();
 	}
 
@@ -1437,4 +1451,44 @@ public class RajawaliRenderer implements GLSurfaceView.Renderer, INode {
 			}
 		}
 	}
+		
+	/**
+	 * Add new AsyncSceneTask
+	 * @param task
+	 */
+	public void addAsyncTasks(IAsyncTask task){
+		mTasks.add(task);
+	}
+	
+	/**
+	 * executeAsyncTask
+	 */
+	public void executeAsyncTasks(){
+		for(IAsyncTask task: mTasks ){
+			if(!mStartedTasks.contains(task)){
+				if(task.beforeTask(this)){
+					mStartedTasks.add(task);
+					task.execute(this);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Remove task from list when is finisched
+	 */
+	public void onAsyncTaskEnd(IAsyncTask task) {
+		if(mTasks.contains(task)){		
+			mTasks.remove(task);
+			if(mStartedTasks.contains(task)){
+				mStartedTasks.remove(task);
+			}
+		}			
+	}
+
+	/**
+	 * Overrideble listener for check changes of async task
+	 */
+	public void onAsyncTaskProgressNotify(IAsyncTask task, Entry<Integer, String> lastValue) {}
+	
 }

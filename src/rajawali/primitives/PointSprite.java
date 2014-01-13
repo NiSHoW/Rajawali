@@ -13,8 +13,7 @@ public class PointSprite extends Plane {
 	
 	@Override
 	public void render(Camera camera, final Matrix4 vpMatrix, final Matrix4 projMatrix, final Matrix4 vMatrix, 
-			final Matrix4 parentMatrix, ColorPickerInfo pickerInfo) {
-		setLookAt(camera.getPosition());		
+			final Matrix4 parentMatrix, ColorPickerInfo pickerInfo) {		
 		super.render(camera, vpMatrix, projMatrix, vMatrix, parentMatrix, pickerInfo);
 	}
 }

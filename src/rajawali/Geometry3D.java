@@ -150,25 +150,32 @@ public class Geometry3D {
 	 * Indicates whether this geometry contains texture coordinates or not.
 	 */
 	protected boolean mHasTextureCoordinates;
-	
 	/**
-	 * Indicate the center of this geometry
+	 * Min geometry point
 	 */
-	protected final Vector3 mCenter, mMin, mMax;
-	
+	protected final Vector3 mMin;
+	/**
+	 * Max geometry point
+	 */
+	protected final Vector3 mMax;
+	/**
+	 * Center of geometry
+	 */
+	protected final Vector3 mCenter;
 	/**
 	 * is this geometry empty?
 	 * Geometry is considerate empty when the object is a container
 	 * and is not calculated the min and max of varius childrens
 	 */
 	protected boolean empty;
-	
+
 	
 	public enum BufferType {
 		FLOAT_BUFFER,
 		INT_BUFFER,
 		SHORT_BUFFER
 	}
+	
 	
 	public Geometry3D() {
 		super();
@@ -177,9 +184,9 @@ public class Geometry3D {
 		mTexCoordBufferInfo = new BufferInfo();
 		mColorBufferInfo = new BufferInfo();
 		mNormalBufferInfo = new BufferInfo();
-		mCenter = new Vector3(0,0,0);
 		mMin = new Vector3();
 		mMax = new Vector3();
+		mCenter = new Vector3();
 		empty = true;
 	}
 	
@@ -229,6 +236,9 @@ public class Geometry3D {
 		return result;
 	}
 	
+	/**
+	 * Return float[] array from a  {@link FloatBuffer} object
+	 */
 	public static float[] getFloatArrayFromBuffer(FloatBuffer buffer) {
 		float[] array = null;
 		if (buffer.hasArray()) {
@@ -241,6 +251,9 @@ public class Geometry3D {
 		return array;
 	}
 	
+	/**
+	 * Return int[] array from a  {@link Buffer} object
+	 */	
 	public static int[] getIntArrayFromBuffer(Buffer buffer) {
 		int[] array = null;
 		if (buffer.hasArray()) {
@@ -279,10 +292,10 @@ public class Geometry3D {
 		this.mOriginalGeometry = geom;
 		this.mHasNormals = geom.hasNormals();
 		this.mHasTextureCoordinates = geom.hasTextureCoordinates();
-		this.empty = geom.isEmpty();
-		this.mCenter.setAll(geom.getCenter());
-		this.mMin.setAll(geom.getMin());
-		this.mMax.setAll(geom.getMax());
+		this.mCenter.setAll(geom.mCenter);
+		this.mMax.setAll(geom.mMax);
+		this.mMin.setAll(geom.mMin);
+		this.empty = geom.empty;
 	}
 	
 	/**
@@ -702,83 +715,176 @@ public class Geometry3D {
 		newData.rewind();
 	    GLES20.glBindBuffer(bufferInfo.target, bufferInfo.bufferHandle);
 	    GLES20.glBufferSubData(bufferInfo.target, index * bufferInfo.byteSize, length * FLOAT_SIZE_BYTES, newData);
+		RajawaliRenderer.checkGLError("OPS! NORMALS 2");
 	    GLES20.glBindBuffer(bufferInfo.target, 0);
 	}
-
+	
+	/**
+	 * Set vertex of geometry
+	 * @param float[] vertices
+	 */
 	public void setVertices(float[] vertices) {
 		setVertices(vertices, false);
 	}
+
 	
+	/**
+	 * Set vertex of geometry
+	 * @param {@link FloatBuffer} vertices 
+	 */
+	public void setVertices(FloatBuffer vertices) {
+		setVertices(vertices, false);
+	}
+	
+	/**
+	 * Set vertex of geometry whit possibility to override old data
+	 * @param float[] vertices
+	 * @param boolean override force replace pass true
+	 */
 	public void setVertices(float[] vertices, boolean override) {
-		if(mVertices == null || override == true) {
-			if(mVertices != null) {
-				mVertices.clear();
-			}
+		FloatBuffer v = ByteBuffer.allocateDirect(vertices.length * FLOAT_SIZE_BYTES)
+				.order(ByteOrder.nativeOrder()).asFloatBuffer();
+		v.put(vertices);
+		setVertices(v, override);
+	}
+	
+	/**
+	 * Set vertex of geometry whit possibility to override old data
+	 * @param {@link FloatBuffer} vertices
+	 * @param boolean override force replace pass true
+	 */
+	public void setVertices(FloatBuffer vertices, boolean override) {
+		
+		vertices.rewind();
+		
+		if(mVertices == null || vertices.capacity() != mVertices.capacity()) {
+			
 			mVertices = ByteBuffer
-					.allocateDirect(vertices.length * FLOAT_SIZE_BYTES)
+					.allocateDirect(vertices.capacity() * FLOAT_SIZE_BYTES)
 					.order(ByteOrder.nativeOrder()).asFloatBuffer();
 			
 			mVertices.put(vertices);
 			mVertices.position(0);
-			mNumVertices = vertices.length / 3;
+			mNumVertices = vertices.capacity() / 3;
 			
-			if(override == true) {
-				//change buffer data
-				changeBufferData(mVertexBufferInfo, mVertices, 0);		
+			if(override){ //make rebind if buffer is changed dimension
+				GLES20.glDeleteBuffers(1, new int[] { mVertexBufferInfo.bufferHandle }, 0);
+				mVertices.compact().position(0);
+				createBuffer(mVertexBufferInfo, BufferType.FLOAT_BUFFER, mVertices, GLES20.GL_ARRAY_BUFFER);
 			}
+			
 		} else {
+			mVertices.position(0);
 			mVertices.put(vertices);
+			mVertices.position(0);
+			
+			if(override == true) { 	//change buffer data
+				changeBufferData(mVertexBufferInfo, mVertices, 0);
+			}
 		}
 		
-		calculateBounds();
+		calculateBounds();				
 	}
 	
-	public void setVertices(FloatBuffer vertices) {
-		vertices.position(0);
-		float[] v = new float[vertices.capacity()];
-		vertices.get(v);
-		setVertices(v);
-	}
-	
+	/**
+	 * return the buffer contains Vertex
+	 * @return {@link FloatBuffer}
+	 */
 	public FloatBuffer getVertices() {
 		if(mOriginalGeometry != null)
 			return mOriginalGeometry.getVertices();
 		return mVertices;
 	}
 	
+	
+	/**
+	 * Set normals array witout override bufferinfo
+	 * 
+	 * @param normals
+	 */
 	public void setNormals(float[] normals) {
+		setNormals(normals, false);
+	}
+	
+	/**
+	 * Set normals buffer witout override bufferinfo
+	 * 
+	 * @param {@link FloatBuffer} normals
+	 */
+	public void setNormals(FloatBuffer normals) {
+		setNormals(normals, false);
+	}	
+	
+	/**
+	 * Set normals array 
+	 * 
+	 * @param normals 
+	 * @param override specify if override glbuffer info
+	 */
+	public void setNormals(float[] normals, boolean override) {		
 		if(normals == null) return;
-		if(mNormals == null) {
-			mNormals = ByteBuffer.allocateDirect(normals.length * FLOAT_SIZE_BYTES)
+		FloatBuffer n = ByteBuffer.allocateDirect(normals.length * FLOAT_SIZE_BYTES)
+				.order(ByteOrder.nativeOrder()).asFloatBuffer();
+		n.put(normals);
+		setNormals(n, override);
+		
+	}
+	
+	/**
+	* Set normals FloatBuffer 
+	* 
+	 * @param {@link FloatBuffer} normals 
+	 * @param override specify if override glbuffer info
+	 */
+	public void setNormals(FloatBuffer normals, boolean override) {		
+		if(normals == null) return;
+		
+		normals.rewind();
+		
+		if(mNormals == null || (mNormals.capacity() != normals.capacity())) {
+		
+			mNormals = ByteBuffer.allocateDirect(normals.capacity() * FLOAT_SIZE_BYTES)
 					.order(ByteOrder.nativeOrder()).asFloatBuffer();
 			mNormals.put(normals);
 			mNormals.position(0);
+			
+			if(override){ //make rebind if buffer is changed dimension
+				GLES20.glDeleteBuffers(1, new int[] { mNormalBufferInfo.bufferHandle }, 0);
+				createBuffer(mNormalBufferInfo, BufferType.FLOAT_BUFFER, mNormals, GLES20.GL_ARRAY_BUFFER);
+			}			
 		} else {
 			mNormals.position(0);
 			mNormals.put(normals);
 			mNormals.position(0);
+			if(override){
+				changeBufferData(mNormalBufferInfo, mNormals, 0);
+			}		
 		}
 		
-		mHasNormals = true;
-	}
-	
-	public void setNormals(FloatBuffer normals) {
-		normals.position(0);
-		float[] n = new float[normals.capacity()];
-		normals.get(n);
-		setNormals(n);
+		mHasNormals = true;		
+		
 	}
 
-	
+	/**
+	 * return normals FloatBuffer
+	 * 
+	 * @return
+	 */
 	public FloatBuffer getNormals() {
 		if(mOriginalGeometry != null)
 			return mOriginalGeometry.getNormals();
 		return mNormals;
 	}
 	
+	/**
+	 * Return if is defined or not the normals
+	 * 
+	 * @return boolean
+	 */
 	public boolean hasNormals() {
 		return mHasNormals;
 	}
+	
 	
 	public void setIndices(int[] indices) {
 		if(mIndicesInt == null) {
@@ -1019,50 +1125,47 @@ public class Geometry3D {
 		return mOnlyShortBufferSupported;
 	}
 	
+	/**
+	 * Get numer of triangles defined in the geometry
+	 * @return number of triangles or 0
+	 */
 	public int getNumTriangles() {
 		return mVertices != null ? mVertices.limit() / 9 : 0;
 	}
 	
-	
 	/**
-	 * maximun vector that can contain the geometry
-	 * @return vector {@link Vector3}
+	 * check if bounds has setted
+	 * @return true if have a dimension
 	 */
-	public Vector3 getMin() {
-		return mMin;
-	}
-	
-
-	/**
-	 * maximun vector that can contain the geometry
-	 * @return vector {@link Vector3}
-	 */
-	public Vector3 getMax() {
-		return mMax;
+	public boolean hasBounds(){
+		return Math.abs(mMin.distanceTo(mMax)) > 0; 
 	}
 	
 	
 	/**
-	 * The Center of this geometry
-	 * @return vector {@link Vector3}
+	 * Set manual bounds
+	 * @param center
+	 * @param min
+	 * @param max
 	 */
-	public Vector3 getCenter(){
-		return mCenter;
+	public void setBounds(Vector3 min, Vector3 max){
+		mMin.setAll(min);
+		mMax.setAll(max);
+		
+		mCenter.setAll(				
+			min.x + (max.x - min.x) * .5, 
+			min.y + (max.y - min.y) * .5, 
+			min.z + (max.z - min.z) * .5
+		);
+		
+		empty = false;
 	}
 	
-	/**
-	 * is empty geometry?
-	 * @return
-	 */
-	public boolean isEmpty(){
-		return empty;
-	}
 	
 	/**
-	 * Calculate limits of this geometry
+	 * Calculates bounds anc center of geometry
 	 */
-	public void calculateBounds() {		
-		//TODO think if it's a best place calculate here the bounds for boundbox
+	protected void calculateBounds(){
 		FloatBuffer vertices = getVertices();		
 		
 		if(vertices != null){
@@ -1096,26 +1199,42 @@ public class Geometry3D {
 	}
 	
 	/**
-	 * Set manual bounds
-	 * @param center
-	 * @param min
-	 * @param max
+	 * return the lowest cords of all vertex
 	 */
-	public void setBounds(Vector3 min, Vector3 max){
-		mMin.setAll(min);
-		mMax.setAll(max);
-		
-		mCenter.setAll(				
-			mMin.x + (mMax.x - mMin.x) * .5, 
-			mMin.y + (mMax.y - mMin.y) * .5, 
-			mMin.z + (mMax.z - mMin.z) * .5
-		);
-		
-		empty = false;
+	public Vector3 getMinLimit(){
+		return mMin;
 	}
+	
+	
+	/**
+	 * return the highest cords of all vertex 
+	 */
+	public Vector3 getMaxLimit(){
+		return mMax;
+	}
+	
+	
+	/**
+	 * return the center cordinates of geometry
+	 */
+	public Vector3 getCenter(){
+		return mCenter;
+	}
+	
+	
+	/**
+	 * is an empty geometry
+	 * 
+	 * @return boolean
+	 */
+	public boolean isEmpty(){
+		return empty;
+	}
+	
 	
 	/**
 	 * Get normalize transform matrix
+	 * 
 	 * @return matrix transformation {@link Matrix4}
 	 */
 	public Matrix4 getNormalizeTransform(){
@@ -1168,6 +1287,112 @@ public class Geometry3D {
 			setVertices(normalizedVertices, true);
 		}
 	}
+	
+	/**
+	 * calculate vertex normals 
+	 */
+	public void computeVertexNormals(){
 
+		FloatBuffer normals = ByteBuffer.allocateDirect(getVertices().limit() * FLOAT_SIZE_BYTES)
+				.order(ByteOrder.nativeOrder()).asFloatBuffer();
+		
+		FloatBuffer vertices = getVertices();
+		IntBuffer faces = (IntBuffer) getIndices();
+		
+		vertices.rewind();
+		faces.rewind();
+		
+		// vertex normals weighted by triangle areas
+		// http://www.iquilezles.org/www/articles/normals/normals.htm
+		Vector3 vA = new Vector3(), 
+				vB = new Vector3(), 
+				vC = new Vector3(),
+				cb = new Vector3(), 
+				ab = new Vector3(),
+				tmp = new Vector3();
+		
+		int index1, index2, index3;
+		double x, y, z;
 
+		while(faces.hasRemaining()) {
+			
+			index1 = faces.get();
+			x = vertices.get(index1);
+			y = vertices.get(index1+1);
+			z = vertices.get(index1+2);
+			vA.setAll(x, y, z);
+			
+			index2 = faces.get();
+			x = vertices.get(index2);
+			y = vertices.get(index2+1);
+			z = vertices.get(index2+2);			
+			vB.setAll(x, y, z);
+			
+			index3 = faces.get();
+			x = vertices.get(index3);
+			y = vertices.get(index3+1);
+			z = vertices.get(index3+2);
+			vC.setAll(x, y, z);
+			
+			ab.setAll(vA).subtract(vB);
+			cb.setAll(vA).subtract(vC);
+			cb.cross(ab).normalize();
+			
+			if(index1 < normals.capacity()){
+				//thereis just a normal for this vector
+				tmp.setAll(normals.get(index1),normals.get(index1+1),normals.get(index1+2)); 
+				tmp.add(cb).normalize();
+			} else {
+				tmp.setAll(cb);
+			}
+			
+			normals.put(index1,  (float) tmp.x);
+			normals.put(index1+1,(float) tmp.y);
+			normals.put(index1+2,(float) tmp.z);
+			
+			ab.setAll(vB).subtract(vA);
+			cb.setAll(vB).subtract(vC);			
+			cb.cross(ab).normalize();		
+			
+			if(index2 < normals.capacity()){
+				//thereis just a normal for this vector
+				tmp.setAll(normals.get(index2),normals.get(index2+1),normals.get(index2+2)); 
+				tmp.add(cb).normalize();
+			} else {
+				tmp.setAll(cb);
+			}
+			
+			//set for B vertex
+			normals.put(index2, (float) cb.x);
+			normals.put(index2+1,(float) cb.y);
+			normals.put(index2+2,(float) cb.z);
+			
+			ab.setAll(vC).subtract(vA);
+			cb.setAll(vC).subtract(vB);			
+			cb.cross(ab).normalize();		
+			
+			if(index3 < normals.capacity()){
+				//thereis just a normal for this vector
+				tmp.setAll(normals.get(index3),normals.get(index3+1),normals.get(index3+2)); 
+				tmp.add(cb).normalize();
+			} else {
+				tmp.setAll(cb);
+			}
+			
+			//set for C vertex
+			normals.put(index3, (float) cb.x);
+			normals.put(index3+1,(float) cb.y);
+			normals.put(index3+2,(float) cb.z);
+
+		}
+
+		vertices.rewind();
+		faces.rewind();
+		normals.rewind();
+		
+		this.setNormals(normals, true);
+		
+	}
+	
+	
 }

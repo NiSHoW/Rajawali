@@ -77,7 +77,7 @@ public class Object3D extends ATransformable3D implements Comparable<Object3D>, 
 	protected boolean mIsPickingEnabled = false;
 	protected float[] mPickingColorArray;
 
-	protected boolean mFrustumTest = false;
+	protected boolean mFrustumTest = true; //why not default?
 	protected boolean mIsInFrustum;
 
 	protected boolean mRenderChildrenAsBatch = false;
@@ -89,6 +89,7 @@ public class Object3D extends ATransformable3D implements Comparable<Object3D>, 
 	protected int mBlendFuncDFactor;
 	protected boolean mEnableDepthTest = true;
 	protected boolean mEnableDepthMask = true;
+	protected boolean mIsBoundingVolume = false;
 
 	public Object3D() {
 		super();
@@ -118,7 +119,7 @@ public class Object3D extends ATransformable3D implements Comparable<Object3D>, 
 	public Object3D(SerializedObject3D ser) {
 		this();
 		setData(ser);
-	}
+	}	
 
 	/**
 	 * Passes the data to the Geometry3D instance. Vertex Buffer Objects (VBOs) will be created.
@@ -278,12 +279,7 @@ public class Object3D extends ATransformable3D implements Comparable<Object3D>, 
 			
 			GLES20.glDepthMask(mEnableDepthMask);
 
-			if (pickerInfo != null && mIsPickingEnabled) {
-				Material pickerMat = pickerInfo.getPicker().getMaterial();
-				pickerMat.useProgram();
-				pickerMat.setColor(mPickingColorArray);
-				pickerMat.setVertices(mGeometry.getVertexBufferInfo().bufferHandle);
-			} else {
+			if (pickerInfo == null || !mIsPickingEnabled) {
 				if (!mIsPartOfBatch) {
 					
 					if (mMaterial == null) {
@@ -327,6 +323,10 @@ public class Object3D extends ATransformable3D implements Comparable<Object3D>, 
 				}
 			} else if (pickerInfo != null && mIsPickingEnabled) {
 				Material pickerMat = pickerInfo.getPicker().getMaterial();
+				pickerMat.useProgram();
+				pickerMat.setColor(mPickingColorArray);
+				pickerMat.applyParams();
+				pickerMat.setVertices(mGeometry.getVertexBufferInfo().bufferHandle);
 				pickerMat.setMVPMatrix(mMVPMatrix);
 				pickerMat.setModelMatrix(mMMatrix);
 				pickerMat.setModelViewMatrix(mMVMatrix);
@@ -352,11 +352,25 @@ public class Object3D extends ATransformable3D implements Comparable<Object3D>, 
 			}
 		}
 
-		if (mShowBoundingVolume) {
-			if (mGeometry.hasBoundingBox())
-				mGeometry.getBoundingBox().drawBoundingVolume(camera, vpMatrix, projMatrix, vMatrix, mMMatrix);
-			if (mGeometry.hasBoundingSphere())
+		boolean mForceShowBoundingVolume = false;
+		
+		if(!mIsBoundingVolume && camera.showBoundingVolume()){
+			mForceShowBoundingVolume = true;
+			if(!mGeometry.hasBoundingBox() && !mGeometry.hasBoundingSphere()){
+				mGeometry.getBoundingBox();				
+			}
+		}
+		
+		
+		if (mShowBoundingVolume || mForceShowBoundingVolume) {
+			if (mGeometry.hasBoundingBox()){
+				mGeometry.getBoundingBox().transform(mMMatrix);
+				mGeometry.getBoundingBox().drawBoundingVolume(camera, vpMatrix, projMatrix, vMatrix, mMMatrix);				
+			}
+			if (mGeometry.hasBoundingSphere()){
+				mGeometry.getBoundingBox().transform(mMMatrix);
 				mGeometry.getBoundingSphere().drawBoundingVolume(camera, vpMatrix, projMatrix, vMatrix, mMMatrix);
+			}
 		}
 		// Draw children without frustum test
 		for (int i = 0, j = mChildren.size(); i < j; i++)
@@ -515,11 +529,6 @@ public class Object3D extends ATransformable3D implements Comparable<Object3D>, 
 		return mChildren.remove(child);
 	}
 	
-	
-	public List<Object3D> getChildrens() {
-		return mChildren;
-	}
-	
 	public Object3D getParent()
 	{
 		return mParent;
@@ -581,32 +590,40 @@ public class Object3D extends ATransformable3D implements Comparable<Object3D>, 
 	}
 
 	public Geometry3D getGeometry() {
-		
-		if(isContainer() && mGeometry.isEmpty()){
-			RajLog.d("Calculate bounds from children");
-			//calculate geometry bounds from childs
-			Vector3 lMin = new Vector3(Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE);
-			Vector3 lMax = new Vector3(-Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE);
-			Geometry3D childGeometry;
-
-			for (int i = 0, j = mChildren.size(); i < j; i++){				
-				childGeometry = mChildren.get(i).getGeometry();
-				if(childGeometry.getMin().x < lMin.x) lMin.x = childGeometry.getMin().x;
-				if(childGeometry.getMin().y < lMin.y) lMin.y = childGeometry.getMin().y;
-				if(childGeometry.getMin().z < lMin.z) lMin.z = childGeometry.getMin().z;
-				if(childGeometry.getMax().x > lMax.x) lMax.x = childGeometry.getMax().x;
-				if(childGeometry.getMax().y > lMax.y) lMax.y = childGeometry.getMax().y;
-				if(childGeometry.getMax().z > lMax.z) lMax.z = childGeometry.getMax().z;
-			}
 			
-			RajLog.d("MIN"+lMin+" MAX"+lMax);
-			//set manual bounds
-			mGeometry.setBounds(lMin, lMax);
+		if(!mGeometry.hasBounds()){
+			if(isContainer() && mChildren.size() > 0){
+				RajLog.d("Calculate bounds from children");
+				//calculate geometry bounds from childs
+				Vector3 lMin = new Vector3(Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE), 
+						lMinTmp = new Vector3();
+				Vector3 lMax = new Vector3(-Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE), 
+						lMaxTmp = new Vector3();
+				Geometry3D childGeometry;
+	
+				for (int i = 0, j = mChildren.size(); i < j; i++){				
+					childGeometry = mChildren.get(i).getGeometry();
+					lMaxTmp.setAll(childGeometry.getMaxLimit()).add(mChildren.get(i).getPosition())
+						   .divide(mChildren.get(i).getScale());
+					lMinTmp.setAll(childGeometry.getMinLimit()).add(mChildren.get(i).getPosition())
+					   		.divide(mChildren.get(i).getScale());
+					if(lMinTmp.x < lMin.x) lMin.x = lMinTmp.x;
+					if(lMinTmp.y < lMin.y) lMin.y = lMinTmp.y;
+					if(lMinTmp.z < lMin.z) lMin.z = lMinTmp.z;
+					if(lMaxTmp.x > lMax.x) lMax.x = lMaxTmp.x;
+					if(lMaxTmp.y > lMax.y) lMax.y = lMaxTmp.y;
+					if(lMaxTmp.z > lMax.z) lMax.z = lMaxTmp.z;
+				}
+				
+				//set manual bounds
+				mGeometry.setBounds(lMin, lMax);
+			} else {
+				RajLog.w("Your object "+this.getName()+" has not dimension...");				
+			}
 		}
 		
 		return mGeometry;
 	}
-
 
 	public Material getMaterial() {
 		return mMaterial;
@@ -692,6 +709,7 @@ public class Object3D extends ATransformable3D implements Comparable<Object3D>, 
 		clone.mBlendFuncDFactor = this.mBlendFuncDFactor;
 		clone.mEnableDepthTest = this.mEnableDepthTest;
 		clone.mEnableDepthMask = this.mEnableDepthMask;
+		//TODO WHERE IS CHILDRENS???
 	}
 
 	public Object3D clone(boolean copyMaterial) {
@@ -706,6 +724,19 @@ public class Object3D extends ATransformable3D implements Comparable<Object3D>, 
 		return clone(true);
 	}
 
+	
+	/**
+	 * Copy object3d from another one
+	 * @param {@link Object3D} another
+	 */
+	public Object3D copy(Object3D another) {
+		another.cloneTo(this, true);
+		this.setRotation(another.getRotation());
+		this.setScale(another.getScale());
+		return this;
+	}
+	
+	
 	public void setVisible(boolean visible) {
 		mIsVisible = visible;
 	}
@@ -861,20 +892,43 @@ public class Object3D extends ATransformable3D implements Comparable<Object3D>, 
 	public TYPE getFrameTaskType() {
 		return AFrameTask.TYPE.OBJECT3D;
 	}
-
-	public void normalize() {
-		RajLog.d("CENTER"+getGeometry().getCenter());
-		Matrix4 matrix = getGeometry().getNormalizeTransform();
-		RajLog.d(matrix.getFloatValues());
+	
+	
+	/**
+	 * Normalize Object or container from -1 to 1
+	 */
+	public void normalize(Matrix4 matrix) {				
 		if(!isContainer()){
 			getGeometry().normalize(matrix);
 		} else {
-			getGeometry().getMin().multiply(matrix);
-			getGeometry().getMax().multiply(matrix);
+			getGeometry().getMinLimit().multiply(matrix);
+			getGeometry().getMaxLimit().multiply(matrix);
+			getGeometry().getCenter().multiply(matrix);			
 		}
 		
-		for(Object3D child : getChildrens()){
-			child.getGeometry().normalize(matrix);
+		if(mPosition != null) mPosition.multiply(matrix);
+		if(mScale != null) mScale.multiply(matrix);
+		
+		for(Object3D child : this.mChildren){
+			child.normalize(matrix);
 		}
 	}
+	
+	
+	
+	/**
+	 * Normalize Object or container from -1 to 1
+	 */
+	public void normalize() {		
+		normalize(getGeometry().getNormalizeTransform());
+	}
+
+	public void isBoundingVolume(boolean isBoundingVolume){
+		mIsBoundingVolume = isBoundingVolume;
+	}
+	
+	public boolean isBoundingVolume(){
+		return mIsBoundingVolume;
+	}
+	
 }

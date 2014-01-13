@@ -16,7 +16,6 @@ import java.io.File;
 
 import rajawali.Object3D;
 import rajawali.materials.textures.TextureManager;
-import rajawali.math.Matrix4;
 import rajawali.renderer.RajawaliRenderer;
 import android.content.res.Resources;
 
@@ -26,6 +25,12 @@ public abstract class AMeshLoader extends ALoader implements IMeshLoader {
 
 	protected Object3D mRootObject;
 
+	
+	public AMeshLoader(){
+		super();
+	}
+	
+	
 	public AMeshLoader(File file) {
 		super(file);
 		mRootObject = new Object3D();
@@ -60,12 +65,6 @@ public abstract class AMeshLoader extends ALoader implements IMeshLoader {
 	public Object3D getParsedObject() {
 		return mRootObject;
 	}
-	
-	public Object3D getParsedObject(boolean normalize) {
-		if(normalize) 		
-			normalize();
-		return getParsedObject();
-	}
 
 	protected class MaterialDef {
 
@@ -81,9 +80,5 @@ public abstract class AMeshLoader extends ALoader implements IMeshLoader {
 		public String specularHighlightTexture;
 		public String alphaTexture;
 		public String bumpTexture;
-	}
-	
-	public void normalize() {			
-		mRootObject.normalize();
 	}
 }

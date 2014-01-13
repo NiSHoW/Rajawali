@@ -54,9 +54,9 @@ public class BoundingBox implements IBoundingVolume {
 	public BoundingBox(Geometry3D geometry) {
 		this();
 		mGeometry = geometry;
-		mMin.setAll(mGeometry.getMin());
-		mMax.setAll(mGeometry.getMax());
 		//calculateBounds(mGeometry);
+		mMin.setAll(geometry.getMinLimit());
+		mMax.setAll(geometry.getMaxLimit());
 		calculatePoints();
 	}
 	
@@ -85,12 +85,13 @@ public class BoundingBox implements IBoundingVolume {
 		pts[7].setAll(max.x, max.y, min.z);
 	}
 
-	public void drawBoundingVolume(Camera camera, final Matrix4 vpMatrix, final Matrix4 projMatrix, 
-			final Matrix4 vMatrix, final Matrix4 mMatrix) {
+	
+	protected void generateVisualBox(){
 		if (mVisualBox == null) {
 			mVisualBox = new Cube(1);
 			Material material = new Material();
 			mVisualBox.setMaterial(material);
+			mVisualBox.isBoundingVolume(true);
 			mVisualBox.setColor(mBoundingColor.get());
 			mVisualBox.setDrawingMode(GLES20.GL_LINE_LOOP);
 			mVisualBox.setDoubleSided(true);
@@ -106,11 +107,23 @@ public class BoundingBox implements IBoundingVolume {
 				mTransformedMin.y + (mTransformedMax.y - mTransformedMin.y) * .5, 
 				mTransformedMin.z + (mTransformedMax.z - mTransformedMin.z) * .5
 				);
+	}
+	
+	
+	/**
+	 * render function for bounding box
+	 */
+	public void drawBoundingVolume(Camera camera, final Matrix4 vpMatrix, final Matrix4 projMatrix, 
+			final Matrix4 vMatrix, final Matrix4 mMatrix) {
 		
+		generateVisualBox();		
 		mVisualBox.render(camera, vpMatrix, projMatrix, vMatrix, mTmpMatrix, null);
 	}
 	
 	public Object3D getVisual() {
+		if(mVisualBox == null){
+			generateVisualBox();
+		}
 		return mVisualBox;
 	}
 	
@@ -172,6 +185,9 @@ public class BoundingBox implements IBoundingVolume {
 		mPoints[7].setAll(mMax.x, mMax.y, mMin.z);
 	}
 	
+	/**
+	 * trasform implementation
+	 */
 	public void transform(final Matrix4 matrix) {
 		mTransformedMin.setAll(Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE);
 		mTransformedMax.setAll(-Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE);

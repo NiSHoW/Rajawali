@@ -36,6 +36,11 @@ public abstract class ALoader implements ILoader {
 	protected String mFileOnSDCard;
 	protected File mFile;
 
+	public ALoader() {
+		mResources = null;
+		mResourceId = 0;
+	}
+	
 	public ALoader(File file) {
 		this(file.getAbsolutePath());
 		mFile = file;
@@ -43,8 +48,7 @@ public abstract class ALoader implements ILoader {
 
 	public ALoader(String fileOnSDCard)
 	{
-		mResources = null;
-		mResourceId = 0;
+		super();
 		mFileOnSDCard = fileOnSDCard;
 	}
 

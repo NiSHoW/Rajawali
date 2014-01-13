@@ -158,7 +158,7 @@ public abstract class ATransformable3D extends AFrameTask implements IGraphNodeM
 		return  qt;
 	}
 	
-	public void setOrientation(Quaternion quat) {
+	public void setOrientation(Quaternion quat) {		
 		mOrientation.setAll(quat);
 		mRotationDirty = false;
 		if (mGraphNode != null) mGraphNode.updateObject(this);
@@ -324,4 +324,10 @@ public abstract class ATransformable3D extends AFrameTask implements IGraphNodeM
 	public Vector3 getScenePosition() {
 		return mPosition;
 	}
+	
+	
+	public boolean isCamera(){
+		return mIsCamera;
+	}
+	
 }

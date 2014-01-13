@@ -14,12 +14,11 @@ package rajawali.materials.textures;
 
 import java.nio.ByteBuffer;
 
-import rajawali.materials.textures.ATexture.FilterType;
-import rajawali.util.RajLog;
-
 import android.opengl.GLES20;
 
-public abstract class ACompressedTexture extends AMultiTexture {
+public abstract class ACompressedTexture extends ATexture {
+
+	protected ByteBuffer[] mByteBuffers;
 
 	/**
 	 * Texture compression type. Texture compression can significantly increase the performance by reducing memory
@@ -135,22 +134,11 @@ public abstract class ACompressedTexture extends AMultiTexture {
 		{
 			GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId);
 
-			if (isMipmap())
-			{
-				RajLog.d("Set mipmap parameters");
-				if (mFilterType == FilterType.LINEAR)
-					GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER,
-							GLES20.GL_LINEAR_MIPMAP_LINEAR);
-				else
-					GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER,
-							GLES20.GL_NEAREST_MIPMAP_NEAREST);
-			} else {
-				if (mFilterType == FilterType.LINEAR)
-					GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
-				else
-					GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
-			}
-			
+			if (mFilterType == FilterType.LINEAR)
+				GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+			else
+				GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
+
 			if (mFilterType == FilterType.LINEAR)
 				GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
 			else
@@ -173,7 +161,6 @@ public abstract class ACompressedTexture extends AMultiTexture {
 							mByteBuffers[i].capacity(), mByteBuffers[i]);
 					w = w > 1 ? w / 2 : 1;
 					h = h > 1 ? h / 2 : 1;
-					mByteBuffers[i].limit(0);
 				}
 			}
 			setTextureId(textureId);
@@ -181,12 +168,11 @@ public abstract class ACompressedTexture extends AMultiTexture {
 			throw new TextureException("Couldn't generate a texture name.");
 		}
 
-//		//moved on top (mByteBuffer == null can cause nullPointerException) 
-//		for (int i = 0; i < mByteBuffers.length; i++) {
-//			if (mByteBuffers[i] != null) {
-//				mByteBuffers[i].limit(0);
-//			}
-//		}
+		for (int i = 0; i < mByteBuffers.length; i++) {
+			if (mByteBuffers[i] != null) {
+				mByteBuffers[i].limit(0);
+			}
+		}
 
 		GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
 	}

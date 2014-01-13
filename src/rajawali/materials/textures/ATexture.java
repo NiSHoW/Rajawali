@@ -122,7 +122,7 @@ public abstract class ATexture extends AFrameTask {
 	/**
 	 * The optional compressed texture
 	 */
-	protected AMultiTexture mMultiTextures;
+	protected ACompressedTexture mCompressedTexture;
 	/**
 	 * The OpenGL texture type
 	 */
@@ -153,10 +153,10 @@ public abstract class ATexture extends AFrameTask {
 		mFilterType = FilterType.LINEAR;
 	}
 	
-	public ATexture(TextureType textureType, String textureName, AMultiTexture compressedTexture)
+	public ATexture(TextureType textureType, String textureName, ACompressedTexture compressedTexture)
 	{
 		this(textureType, textureName);
-		setMultiTexture(compressedTexture);
+		setCompressedTexture(compressedTexture);
 	}
 	
 	protected ATexture() {
@@ -198,7 +198,7 @@ public abstract class ATexture extends AFrameTask {
 		mWrapType = other.getWrapType();
 		mFilterType = other.getFilterType();
 		mBitmapConfig = other.getBitmapConfig();
-		mMultiTextures = other.getMultiTexture();
+		mCompressedTexture = other.getCompressedTexture();
 		mGLTextureType = other.getGLTextureType();
 		mMaterialsUsingTexture = other.mMaterialsUsingTexture;
 	}
@@ -515,14 +515,14 @@ public abstract class ATexture extends AFrameTask {
 		mOffset[1] = v;
 	}
 	
-	public void setMultiTexture(AMultiTexture multiTexture)
+	public void setCompressedTexture(ACompressedTexture compressedTexture)
 	{
-		mMultiTextures = multiTexture;
+		mCompressedTexture = compressedTexture;
 	}
 	
-	public AMultiTexture getMultiTexture()
+	public ACompressedTexture getCompressedTexture()
 	{
-		return mMultiTextures;
+		return mCompressedTexture;
 	}
 	
 	abstract void add() throws TextureException;

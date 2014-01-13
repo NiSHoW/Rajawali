@@ -237,13 +237,23 @@ public class Plane extends Object3D {
 				int ur = (col + 1) * colspan + row;
 				int lr = ur + 1;
 
+				//counter clockwise
 				indices[indexCount++] = (int) ur;
+				indices[indexCount++] = (int) lr;
+				indices[indexCount++] = (int) ul;
+				
 				indices[indexCount++] = (int) ul;
 				indices[indexCount++] = (int) lr;
+				indices[indexCount++] = (int) ll;						
 
-				indices[indexCount++] = (int) lr;
-				indices[indexCount++] = (int) ul;
-				indices[indexCount++] = (int) ll;
+				//clockwise
+//				indices[indexCount++] = (int) ur;
+//				indices[indexCount++] = (int) ul;
+//				indices[indexCount++] = (int) lr;
+//
+//				indices[indexCount++] = (int) lr;
+//				indices[indexCount++] = (int) ul;
+//				indices[indexCount++] = (int) ll;
 			}
 		}
 

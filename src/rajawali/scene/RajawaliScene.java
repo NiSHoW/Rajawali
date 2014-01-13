@@ -22,6 +22,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import rajawali.Camera;
 import rajawali.Object3D;
 import rajawali.animation.Animation3D;
+import rajawali.bounds.IBoundingVolume;
 import rajawali.lights.ALight;
 import rajawali.materials.Material;
 import rajawali.materials.textures.ATexture;
@@ -42,6 +43,7 @@ import rajawali.scenegraph.IGraphNode;
 import rajawali.scenegraph.IGraphNode.GRAPH_TYPE;
 import rajawali.scenegraph.IGraphNodeMember;
 import rajawali.scenegraph.Octree;
+import rajawali.util.ObjectColorPicker;
 import rajawali.util.ObjectColorPicker.ColorPickerInfo;
 import rajawali.util.ObjectColorPicker.ObjectColorPickerException;
 import android.graphics.Color;
@@ -739,17 +741,27 @@ public class RajawaliScene extends AFrameTask {
 				mChildren.get(i).render(mCamera, mVPMatrix, mPMatrix, mVMatrix, pickerInfo);
 		}
 
+		
+		if(mCamera.showBoundingVolume()){
+			synchronized (mNextCameraLock) {
+				for (int i = 0, j = mCameras.size(); i < j; ++i) {
+					if(mCameras.get(i) != mCamera)
+						mCameras.get(i).render(mCamera, mVPMatrix, mPMatrix, mVMatrix, pickerInfo);
+				}
+			}
+		}		
+		
 		if (mDisplaySceneGraph) {
 			mSceneGraph.displayGraph(mCamera, mVPMatrix, mPMatrix, mVMatrix);
         }
 		
 		if (pickerInfo != null) {
-			pickerInfo.getPicker().createColorPickingTexture(pickerInfo);
+			ObjectColorPicker.createColorPickingTexture(pickerInfo);
 			pickerInfo.getPicker().unbindFrameBuffer();
 			pickerInfo = null;
 			mPickerInfo = null;
 			render(deltaTime, renderTarget); //TODO Possible timing error here
-		}
+		}		
 
 		synchronized (mPlugins) {
 			for (int i = 0, j = mPlugins.size(); i < j; i++)
@@ -1773,4 +1785,5 @@ public class RajawaliScene extends AFrameTask {
 	public TYPE getFrameTaskType() {
 		return AFrameTask.TYPE.SCENE;
 	}
+		
 }

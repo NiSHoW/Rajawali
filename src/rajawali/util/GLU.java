@@ -42,7 +42,6 @@ public class GLU {
     public static String gluErrorString(int error) {
         switch (error) {
         case GLES20.GL_NO_ERROR:
-            return "no error";
         case GLES20.GL_INVALID_ENUM:
             return "invalid enum ->" +
             	"An unacceptable value is specified for an enumerated argument." +

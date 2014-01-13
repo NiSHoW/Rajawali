@@ -21,7 +21,6 @@ import rajawali.materials.Material;
 import rajawali.math.Matrix4;
 import rajawali.math.vector.Vector3;
 import rajawali.primitives.Sphere;
-import rajawali.util.RajLog;
 import android.opengl.GLES20;
 
 public class BoundingSphere implements IBoundingVolume {
@@ -43,18 +42,20 @@ public class BoundingSphere implements IBoundingVolume {
 	
 	public BoundingSphere(Geometry3D geometry) {
 		this();
-		mGeometry = geometry;	
-		Vector3 mmin = geometry.getMin();
-		Vector3 mmax = geometry.getMax();
-		double distance = 0;
-		if((mmax.x - mmin.x) > distance) distance = (mmax.x - mmin.x);
-		if((mmax.y - mmin.y) > distance) distance = (mmax.y - mmin.y);
-		if((mmax.z - mmin.z) > distance) distance = (mmax.z - mmin.z);
-		mRadius = (distance/2.0);
+		mGeometry = geometry;
 		//calculateBounds(mGeometry);
+		double distance = 0;
+		Vector3 mMax = mGeometry.getMaxLimit();
+		Vector3 mMin = mGeometry.getMinLimit();
+		if((mMax.x - mMin.x) > distance) distance = (mMax.x - mMin.x);
+		if((mMax.y - mMin.y) > distance) distance = (mMax.y - mMin.y);
+		if((mMax.z - mMin.z) > distance) distance = (mMax.z - mMin.z);
+		mRadius = (distance/2.0);
 	}
 	
 	public Object3D getVisual() {
+		if(mVisualSphere == null)
+			generateVisualBox();
 		return mVisualSphere;
 	}
 	
@@ -66,10 +67,11 @@ public class BoundingSphere implements IBoundingVolume {
 		return mBoundingColor;
 	}
 	
-	public void drawBoundingVolume(Camera camera, final Matrix4 vpMatrix, final Matrix4 projMatrix,
-			final Matrix4 vMatrix, final Matrix4 mMatrix) {
+	
+	protected void generateVisualBox(){
 		if(mVisualSphere == null) {
 			mVisualSphere = new Sphere(1, 8, 8);
+			mVisualSphere.isBoundingVolume(true);
 			Material material = new Material();
 			mVisualSphere.setMaterial(material);
 			mVisualSphere.setColor(0xffffff00);
@@ -78,18 +80,29 @@ public class BoundingSphere implements IBoundingVolume {
 		}
 
 		mVisualSphere.setPosition(mPosition);
-		mVisualSphere.setScale(mRadius * mScale);
+		mVisualSphere.setScale(mRadius * mScale);		
+	}
+	
+	
+	/**
+	 * render function for bounding volume
+	 */
+	public void drawBoundingVolume(Camera camera, final Matrix4 vpMatrix, final Matrix4 projMatrix,
+			final Matrix4 vMatrix, final Matrix4 mMatrix) {
+		generateVisualBox();
 		mVisualSphere.render(camera, vpMatrix, projMatrix, vMatrix, mTmpMatrix, null);
 	}
 	
+		
+	/**
+	 * trasform bounding box with a transform matrix 
+	 */
 	public void transform(Matrix4 matrix) {
 		mPosition.setAll(0, 0, 0);
 		mPosition.multiply(matrix);
 		matrix.getScaling(mTmpPos);
-		RajLog.d("SCALING TMP"+mTmpPos);
 		mScale = mTmpPos.x > mTmpPos.y ? mTmpPos.x : mTmpPos.y;
 		mScale = mScale > mTmpPos.z ? mScale : mTmpPos.z;
-		RajLog.d("SCALIE"+mScale);
 	}
 	
 	@Deprecated
